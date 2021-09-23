@@ -240,13 +240,9 @@ const MemoizedBar = React.memo(
 
     const histoOptions = {
       scales: {
-        yAxes: [
-          {
-            ticks: {
-              beginAtZero: true,
-            },
-          },
-        ],
+        y: {
+          beginAtZero: true,
+        },
       },
     };
 
