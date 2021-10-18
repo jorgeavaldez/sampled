@@ -204,7 +204,11 @@ const FAIR_LAUNCH_LOTTERY_SIZE =
   1 + // bump
   8; // size of bitmask ones
 
-const isWinner = (fairLaunch: FairLaunchAccount | undefined): boolean => {
+const isWinner = (
+  fairLaunch: FairLaunchAccount | undefined,
+  fairLaunchBalance: number,
+): boolean => {
+  if (fairLaunchBalance > 0) return true;
   if (
     !fairLaunch?.lottery.data ||
     !fairLaunch?.lottery.data.length ||
@@ -227,7 +231,7 @@ const isWinner = (fairLaunch: FairLaunchAccount | undefined): boolean => {
 };
 
 const Home = (props: HomeProps) => {
-  const [fairLaunchBalance, setFairLaunchBalance] = useState<number>();
+  const [fairLaunchBalance, setFairLaunchBalance] = useState<number>(0);
   const [yourSOLBalance, setYourSOLBalance] = useState<number | null>(null);
 
   const [isMinting, setIsMinting] = useState(false); // true when user got to press MINT
@@ -268,7 +272,10 @@ const Home = (props: HomeProps) => {
     try {
       setIsMinting(true);
       if (wallet.connected && candyMachine?.program && wallet.publicKey) {
-        if (fairLaunch?.ticket.data?.state.unpunched && isWinner(fairLaunch)) {
+        if (
+          fairLaunch?.ticket.data?.state.unpunched &&
+          isWinner(fairLaunch, fairLaunchBalance)
+        ) {
           await onPunchTicket();
         }
 
@@ -431,15 +438,25 @@ const Home = (props: HomeProps) => {
 
     console.log('deposit');
     setIsMinting(true);
-    await purchaseTicket(contributed, anchorWallet, fairLaunch);
-    setIsMinting(false);
-    setAlertState({
-      open: true,
-      message: `Congratulations! Bid ${
-        fairLaunch?.ticket.data ? 'updated' : 'inserted'
-      }!`,
-      severity: 'success',
-    });
+    try {
+      await purchaseTicket(contributed, anchorWallet, fairLaunch);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message: `Congratulations! Bid ${
+          fairLaunch?.ticket.data ? 'updated' : 'inserted'
+        }!`,
+        severity: 'success',
+      });
+    } catch (e) {
+      console.log(e);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message: 'Something went wrong.',
+        severity: 'error',
+      });
+    }
   };
   const onRugRefund = async () => {
     if (!anchorWallet) {
@@ -447,15 +464,25 @@ const Home = (props: HomeProps) => {
     }
 
     console.log('refund');
-    setIsMinting(true);
-    await receiveRefund(anchorWallet, fairLaunch);
-    setIsMinting(false);
-    setAlertState({
-      open: true,
-      message:
-        'Congratulations! You have received a refund. This is an irreversible action.',
-      severity: 'success',
-    });
+    try {
+      setIsMinting(true);
+      await receiveRefund(anchorWallet, fairLaunch);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message:
+          'Congratulations! You have received a refund. This is an irreversible action.',
+        severity: 'success',
+      });
+    } catch (e) {
+      console.log(e);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message: 'Something went wrong.',
+        severity: 'error',
+      });
+    }
   };
   const onRefundTicket = async () => {
     if (!anchorWallet) {
@@ -463,15 +490,25 @@ const Home = (props: HomeProps) => {
     }
 
     console.log('refund');
-    setIsMinting(true);
-    await purchaseTicket(0, anchorWallet, fairLaunch);
-    setIsMinting(false);
-    setAlertState({
-      open: true,
-      message:
-        'Congratulations! Funds withdrawn. This is an irreversible action.',
-      severity: 'success',
-    });
+    try {
+      setIsMinting(true);
+      await purchaseTicket(0, anchorWallet, fairLaunch);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message:
+          'Congratulations! Funds withdrawn. This is an irreversible action.',
+        severity: 'success',
+      });
+    } catch (e) {
+      console.log(e);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message: 'Something went wrong.',
+        severity: 'error',
+      });
+    }
   };
 
   const onPunchTicket = async () => {
@@ -481,13 +518,23 @@ const Home = (props: HomeProps) => {
 
     console.log('punch');
     setIsMinting(true);
-    await punchTicket(anchorWallet, fairLaunch);
-    setIsMinting(false);
-    setAlertState({
-      open: true,
-      message: 'Congratulations! Ticket punched!',
-      severity: 'success',
-    });
+    try {
+      await punchTicket(anchorWallet, fairLaunch);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message: 'Congratulations! Ticket punched!',
+        severity: 'success',
+      });
+    } catch (e) {
+      console.log(e);
+      setIsMinting(false);
+      setAlertState({
+        open: true,
+        message: 'Something went wrong.',
+        severity: 'error',
+      });
+    }
   };
 
   const phase = getPhase(fairLaunch, candyMachine);
@@ -750,7 +797,7 @@ const Home = (props: HomeProps) => {
 
                 {[Phase.Phase3].includes(phase) && (
                   <>
-                    {isWinner(fairLaunch) && (
+                    {isWinner(fairLaunch, fairLaunchBalance) && (
                       <MintButton
                         onClick={onPunchTicket}
                         variant="contained"
@@ -762,7 +809,7 @@ const Home = (props: HomeProps) => {
                       </MintButton>
                     )}
 
-                    {!isWinner(fairLaunch) && (
+                    {!isWinner(fairLaunch, fairLaunchBalance) && (
                       <MintButton
                         onClick={onRefundTicket}
                         variant="contained"
@@ -780,7 +827,8 @@ const Home = (props: HomeProps) => {
 
                 {phase === Phase.Phase4 && (
                   <>
-                    {(!fairLaunch || isWinner(fairLaunch)) && (
+                    {(!fairLaunch ||
+                      isWinner(fairLaunch, fairLaunchBalance)) && (
                       <MintContainer>
                         <MintButton
                           disabled={
@@ -807,7 +855,7 @@ const Home = (props: HomeProps) => {
                       </MintContainer>
                     )}
 
-                    {!isWinner(fairLaunch) && (
+                    {!isWinner(fairLaunch, fairLaunchBalance) && (
                       <MintButton
                         onClick={onRefundTicket}
                         variant="contained"
@@ -851,7 +899,7 @@ const Home = (props: HomeProps) => {
                     if (
                       !fairLaunch ||
                       phase === Phase.Lottery ||
-                      isWinner(fairLaunch)
+                      isWinner(fairLaunch, fairLaunchBalance)
                     ) {
                       setRefundExplainerOpen(true);
                     } else {
